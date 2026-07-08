@@ -1,0 +1,6 @@
+{
+  "name": "CareOS",
+  "description": "Clinically-governed AI care platform: Chat, scan, triage, escalate, refer, and insure.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
