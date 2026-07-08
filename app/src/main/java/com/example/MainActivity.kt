@@ -47,6 +47,7 @@ import com.example.data.InsuranceProfile
 import com.example.data.ReferralRecord
 import com.example.ui.CareViewModel
 import com.example.ui.theme.MyApplicationTheme
+import com.example.api.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -2061,6 +2062,10 @@ fun TelehealthScreen(viewModel: CareViewModel) {
     var telehealthInput by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
+    // Cloudflare Stream TUS Uploader state and UI controls
+    val uploaderState = rememberCloudflareUploader()
+    var showStreamUploadPanel by remember { mutableStateOf(false) }
+
     // Scroll down on messages changes
     LaunchedEffect(doctorMessages.size) {
         if (doctorMessages.isNotEmpty()) {
@@ -2073,22 +2078,382 @@ fun TelehealthScreen(viewModel: CareViewModel) {
             .fillMaxSize()
             .testTag("telehealth_screen")
     ) {
-        // Active doctor header
+        // Active doctor header with Cloudflare Stream upload toggle
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F5F9)),
             shape = RoundedCornerShape(0.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFE2E8F0)),
-                    contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("👩‍⚕️", fontSize = 18.sp)
+                    Box(
+                        modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFE2E8F0)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("👩‍⚕️", fontSize = 18.sp)
+                    }
+                    Column {
+                        Text("Dr. Chioma Nwachukwu, GP", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("CareOS Duty Doctor • Board Registry: LUTH-MD-2901", fontSize = 9.5.sp, color = Color.Gray)
+                    }
                 }
-                Column {
-                    Text("Dr. Chioma Nwachukwu, GP", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("CareOS Duty Doctor • Board Registry: LUTH-MD-2901", fontSize = 9.5.sp, color = Color.Gray)
+                
+                IconButton(
+                    onClick = { showStreamUploadPanel = !showStreamUploadPanel },
+                    modifier = Modifier.testTag("cloudflare_upload_toggle_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.VideoCall,
+                        contentDescription = "Cloudflare Live Stream Upload",
+                        tint = if (showStreamUploadPanel) Color(0xFFE11D48) else Color(0xFF0F766E),
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+
+        // Expanded Cloudflare Stream TUS Upload Dashboard
+        if (showStreamUploadPanel) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+                    .testTag("cloudflare_upload_panel"),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFAFAF9)),
+                border = BorderStroke(1.5.dp, Color(0xFFE7E5E4)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("📹", fontSize = 22.sp)
+                            Text(
+                                text = "Cloudflare Stream Integration",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 13.sp,
+                                color = Color(0xFF1C1917)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    when (uploaderState.state) {
+                                        is CloudflareUploadState.Uploading -> Color(0xFFFEF08A)
+                                        is CloudflareUploadState.Completed -> Color(0xFFDCFCE7)
+                                        is CloudflareUploadState.Error -> Color(0xFFFEE2E2)
+                                        else -> Color(0xFFE7E5E4)
+                                    },
+                                    RoundedCornerShape(6.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            val statusText = when (uploaderState.state) {
+                                is CloudflareUploadState.Idle -> "TUS Idle"
+                                is CloudflareUploadState.GeneratingToken -> "Generating..."
+                                is CloudflareUploadState.Uploading -> if ((uploaderState.state as CloudflareUploadState.Uploading).isPaused) "Paused" else "Uploading"
+                                is CloudflareUploadState.Completed -> "Uploaded ✅"
+                                is CloudflareUploadState.Error -> "Failed ❌"
+                            }
+                            Text(
+                                text = statusText,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Securely generate single-use TUS upload tokens server-side and upload video recordings directly to Cloudflare Stream CDN. Supports resumable chunked uploading.",
+                        fontSize = 11.sp,
+                        color = Color(0xFF57534E),
+                        lineHeight = 15.sp
+                    )
+
+                    HorizontalDivider(color = Color(0xFFE7E5E4))
+
+                    when (val uploadState = uploaderState.state) {
+                        is CloudflareUploadState.Idle -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    text = "Choose Simulated Video Payload Size to Upload:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF292524)
+                                )
+
+                                var selectedSizeMb by remember { mutableStateOf(5) }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf(5, 15, 30).forEach { size ->
+                                        val isSel = selectedSizeMb == size
+                                        Card(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable { selectedSizeMb = size },
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isSel) Color(0xFF0F766E) else Color.White
+                                            ),
+                                            border = BorderStroke(1.dp, if (isSel) Color(0xFF0F766E) else Color(0xFFD6D3D1)),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text(
+                                                text = "${size}MB\n" + when(size) {
+                                                    5 -> "Symptom Clip"
+                                                    15 -> "GP Consult"
+                                                    else -> "Full Session"
+                                                },
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSel) Color.White else Color.Black,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(8.dp),
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val sizeBytes = selectedSizeMb * 1024 * 1024
+                                        val mockBytes = ByteArray(sizeBytes) { 0x0A }
+                                        uploaderState.onStartUpload(mockBytes)
+                                    },
+                                    modifier = Modifier.fillMaxWidth().testTag("start_cloudflare_upload_btn"),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(imageVector = Icons.Default.CloudUpload, contentDescription = "Upload icon")
+                                        Text("Generate Token & Upload to Cloudflare")
+                                    }
+                                }
+                            }
+                        }
+
+                        is CloudflareUploadState.GeneratingToken -> {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                CircularProgressIndicator(color = Color(0xFF0D9488), modifier = Modifier.size(36.dp))
+                                Text(
+                                    text = "Accessing secure server environment config...",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF57534E)
+                                )
+                                Text(
+                                    text = "Generating Cloudflare TUS direct-creator upload URL securely...",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
+                        is CloudflareUploadState.Uploading -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = if (uploadState.isPaused) "Upload Paused (TUS Resumable)" else "Uploading Chunked Stream...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF1C1917)
+                                        )
+                                        Text(
+                                            text = "Offset: ${com.example.api.formatBytes(uploadState.bytesUploaded)} / ${com.example.api.formatBytes(uploadState.totalBytes)} (${(uploadState.progress * 100).toInt()}%)",
+                                            fontSize = 10.sp,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                    if (!uploadState.isPaused) {
+                                        Text(
+                                            text = "${com.example.api.formatSpeed(uploadState.uploadSpeedBytesPerSec)} | ETA: ${uploadState.etaSeconds}s",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0D9488)
+                                        )
+                                    }
+                                }
+
+                                LinearProgressIndicator(
+                                    progress = { uploadState.progress },
+                                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                                    color = Color(0xFF0D9488),
+                                    trackColor = Color(0xFFE7E5E4)
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (uploadState.isPaused) {
+                                        Button(
+                                            onClick = { uploaderState.onResume() },
+                                            modifier = Modifier.weight(1f).testTag("resume_upload_btn"),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488))
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Icon(imageVector = Icons.Default.PlayArrow, contentDescription = "Play Icon", modifier = Modifier.size(16.dp))
+                                                Text("Resume TUS Upload", fontSize = 11.sp)
+                                            }
+                                        }
+                                    } else {
+                                        Button(
+                                            onClick = { uploaderState.onPause() },
+                                            modifier = Modifier.weight(1f).testTag("pause_upload_btn"),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48))
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Icon(imageVector = Icons.Default.Pause, contentDescription = "Pause Icon", modifier = Modifier.size(16.dp))
+                                                Text("Pause Upload", fontSize = 11.sp)
+                                            }
+                                        }
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = { uploaderState.onCancel() },
+                                        modifier = Modifier.weight(0.5f).testTag("cancel_upload_btn"),
+                                        border = BorderStroke(1.dp, Color(0xFFD6D3D1)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Cancel", fontSize = 11.sp, color = Color.Black)
+                                    }
+                                }
+                            }
+                        }
+
+                        is CloudflareUploadState.Completed -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFECFDF5), RoundedCornerShape(8.dp))
+                                    .padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "🎉 Cloudflare Video Upload Successful!",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF047857)
+                                )
+                                Text(
+                                    text = if (uploadState.isMock) "Demo Simulation Mode: Successfully generated and tracked resumable TUS upload offsets locally."
+                                           else "Production Mode: Real TUS upload complete! Video stream has been parsed and is now live on Cloudflare Stream CDN.",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF065F46)
+                                )
+                                androidx.compose.foundation.text.selection.SelectionContainer {
+                                    Column {
+                                        Text(
+                                            text = "UID: ${uploadState.videoUid}",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color.DarkGray
+                                        )
+                                        Text(
+                                            text = "Watch: ${uploadState.watchUrl}",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF0D9488)
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            viewModel.sendDoctorMessage("Check out the video stream from our telehealth session recorded live: ${uploadState.watchUrl}")
+                                            uploaderState.onCancel()
+                                        },
+                                        modifier = Modifier.weight(1.5f).testTag("send_video_link_btn"),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488))
+                                    ) {
+                                        Text("Send Video Link to Dr.", fontSize = 11.sp)
+                                    }
+
+                                    Button(
+                                        onClick = { uploaderState.onCancel() },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                                    ) {
+                                        Text("Clear", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        is CloudflareUploadState.Error -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFFEF2F2), RoundedCornerShape(8.dp))
+                                    .padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "❌ Upload Failed",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFB91C1C)
+                                )
+                                Text(
+                                    text = uploadState.message,
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF991B1B)
+                                )
+
+                                Text(
+                                    text = "Tip: Make sure you have entered valid CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN environment variables in the secure Secrets panel in AI Studio if you wish to run a live upload. Otherwise, it will automatically run in sandbox simulation mode.",
+                                    fontSize = 10.sp,
+                                    color = Color.Gray,
+                                    lineHeight = 14.sp
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { uploaderState.onCancel() },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C))
+                                    ) {
+                                        Text("Try Again", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
