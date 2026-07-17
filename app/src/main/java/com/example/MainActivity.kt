@@ -7839,7 +7839,7 @@ fun generateInvestorPresentationPdf(context: android.content.Context) {
         fileOutputStream.close()
         
         // Trigger Share Intent with FileProvider
-        val uri = androidx.core.content.FileProvider.getUriForFile(context, "com.example.fileprovider", file)
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.fileprovider", file)
         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
