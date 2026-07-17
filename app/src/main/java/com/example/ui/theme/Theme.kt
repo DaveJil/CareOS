@@ -13,28 +13,30 @@ import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme =
   darkColorScheme(
-    primary = TealPrimary,
-    secondary = TealSecondary,
-    tertiary = TealTertiary,
-    background = SlateBackground,
-    surface = SlateDark,
-    onPrimary = TextLight,
-    onSecondary = TextLight,
-    onBackground = TextLight,
-    onSurface = TextLight
+    primary = ClinicDarkAccent,
+    secondary = ClinicDarkAltSurface,
+    tertiary = ClinicSecondarySoft,
+    background = ClinicDarkBackground,
+    surface = ClinicDarkSurface,
+    onPrimary = ClinicDarkBackground,
+    onSecondary = ClinicDarkTextPrimary,
+    onBackground = ClinicDarkTextPrimary,
+    onSurface = ClinicDarkTextPrimary,
+    outline = ClinicDarkBorder
   )
 
 private val LightColorScheme =
   lightColorScheme(
-    primary = TealPrimary,
-    secondary = TealSecondary,
-    tertiary = TealTertiary,
-    background = SlateBackground,
-    surface = Color.White,
+    primary = ClinicPrimary,
+    secondary = ClinicPrimaryDark,
+    tertiary = ClinicSecondarySoft,
+    background = ClinicBackground,
+    surface = ClinicSurface,
     onPrimary = Color.White,
     onSecondary = Color.White,
-    onBackground = TextLight,
-    onSurface = TextLight
+    onBackground = ClinicTextPrimary,
+    onSurface = ClinicTextPrimary,
+    outline = ClinicBorder
   )
 
 @Composable

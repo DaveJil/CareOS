@@ -101,72 +101,267 @@ fun CareOSApp(
     var showClinicalSafetyDialog by remember { mutableStateOf(false) }
     var showInvestorDeckDialog by remember { mutableStateOf(false) }
 
-    val triages by viewModel.allTriages.collectAsState()
+    val currentPatient by viewModel.currentPatient.collectAsState()
+    val triages by viewModel.isolatedTriages.collectAsState()
     val activeIns by viewModel.activeInsurance.collectAsState()
+    val urgentEscalation by viewModel.urgentEscalation.collectAsState()
 
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("main_scaffold"),
-        topBar = {
-            CareOSTopBar(
-                currentTab = currentTab,
-                onLhrClick = { showLhrDialog = true },
-                onInvestorDeckClick = { showInvestorDeckDialog = true },
-                onAdminClick = { currentTab = "admin" },
-                activeInsurance = activeIns
-            )
-        },
-        bottomBar = {
-            CareOSBottomNavigation(
-                currentTab = currentTab,
-                onTabSelect = { currentTab = it }
+    if (currentPatient == null) {
+        CareOSAuthScreen(viewModel = viewModel)
+        return
+    }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isTablet = maxWidth >= 600.dp
+
+        if (isTablet) {
+            // TABLET / DESKTOP RESPONSIVE SIDEBAR LAYOUT
+            Row(modifier = Modifier.fillMaxSize()) {
+                CareOSNavigationSidebar(
+                    currentTab = currentTab,
+                    onTabSelect = { currentTab = it },
+                    activeInsurance = activeIns,
+                    onLhrClick = { showLhrDialog = true },
+                    onInvestorDeckClick = { showInvestorDeckDialog = true },
+                    onAdminClick = { currentTab = "admin" },
+                    viewModel = viewModel
+                )
+
+                // Main Content Panel
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Urgent Escalation Header Banner inside Tablet View
+                        if (urgentEscalation != null) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEE2E2)),
+                                border = BorderStroke(1.5.dp, Color(0xFFDC2626)),
+                                shape = RoundedCornerShape(0.dp),
+                                modifier = Modifier.fillMaxWidth().testTag("urgent_escalation_banner")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text("🚨", fontSize = 24.sp)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("CRITICAL MEDICAL ESCALATION ALERT", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF991B1B))
+                                        Text(urgentEscalation ?: "", fontSize = 10.5.sp, color = Color(0xFF7F1D1D))
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { currentTab = "telehealth" },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text("Connect Live GP", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.clearUrgentEscalation() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray, contentColor = Color.DarkGray),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text("Dismiss", fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            when (currentTab) {
+                                "triage" -> TriageScreen(
+                                    viewModel = viewModel,
+                                    onEscalateClick = { currentTab = "telehealth" },
+                                    onNavigateToTab = { currentTab = it },
+                                    onLhrClick = { showLhrDialog = true },
+                                    onSafetyCenterClick = { showClinicalSafetyDialog = true },
+                                    onSpeak = onSpeak,
+                                    onStopSpeaking = onStopSpeaking
+                                )
+                                "scan" -> SymptomScanScreen(viewModel = viewModel, onStartTriageClick = { currentTab = "triage" })
+                                "specialists" -> SpecialistsScreen(viewModel = viewModel)
+                                "telehealth" -> TelehealthScreen(viewModel = viewModel)
+                                "referral" -> ReferralScreen(viewModel = viewModel)
+                                "insurance" -> InsuranceScreen(viewModel = viewModel)
+                                "fund" -> FundScreen(viewModel = viewModel)
+                                "admin" -> AdminPanelScreen(viewModel = viewModel)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // COMPACT MOBILE PHONE BOTTOM NAV SCALED LAYOUT
+            Scaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("main_scaffold"),
+                topBar = {
+                    CareOSTopBar(
+                        currentTab = currentTab,
+                        onLhrClick = { showLhrDialog = true },
+                        onInvestorDeckClick = { showInvestorDeckDialog = true },
+                        onAdminClick = { currentTab = "admin" },
+                        activeInsurance = activeIns
+                    )
+                },
+                bottomBar = {
+                    CareOSBottomNavigation(
+                        currentTab = currentTab,
+                        onTabSelect = { currentTab = it }
+                    )
+                }
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Urgent Escalation Header Banner inside Compact Mobile View
+                        if (urgentEscalation != null) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEE2E2)),
+                                border = BorderStroke(1.dp, Color(0xFFDC2626)),
+                                shape = RoundedCornerShape(0.dp),
+                                modifier = Modifier.fillMaxWidth().testTag("urgent_escalation_banner")
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text("🚨", fontSize = 16.sp)
+                                        Text("CRITICAL MEDICAL ESCALATION ALERT", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color(0xFF991B1B))
+                                    }
+                                    Text(urgentEscalation ?: "", fontSize = 9.sp, color = Color(0xFF7F1D1D))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                                        Button(
+                                            onClick = { currentTab = "telehealth" },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                                            modifier = Modifier.weight(1f).height(32.dp),
+                                            shape = RoundedCornerShape(4.dp),
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            Text("Connect GP", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.clearUrgentEscalation() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray, contentColor = Color.DarkGray),
+                                            modifier = Modifier.weight(1f).height(32.dp),
+                                            shape = RoundedCornerShape(4.dp),
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            Text("Dismiss", fontSize = 10.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            when (currentTab) {
+                                "triage" -> TriageScreen(
+                                    viewModel = viewModel,
+                                    onEscalateClick = { currentTab = "telehealth" },
+                                    onNavigateToTab = { currentTab = it },
+                                    onLhrClick = { showLhrDialog = true },
+                                    onSafetyCenterClick = { showClinicalSafetyDialog = true },
+                                    onSpeak = onSpeak,
+                                    onStopSpeaking = onStopSpeaking
+                                )
+                                "scan" -> SymptomScanScreen(viewModel = viewModel, onStartTriageClick = { currentTab = "triage" })
+                                "specialists" -> SpecialistsScreen(viewModel = viewModel)
+                                "telehealth" -> TelehealthScreen(viewModel = viewModel)
+                                "referral" -> ReferralScreen(viewModel = viewModel)
+                                "insurance" -> InsuranceScreen(viewModel = viewModel)
+                                "fund" -> FundScreen(viewModel = viewModel)
+                                "admin" -> AdminPanelScreen(viewModel = viewModel)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Global Alert Dialog Modals
+        if (showLhrDialog) {
+            LhrDialog(
+                triages = triages,
+                onDismiss = { showLhrDialog = false }
             )
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            when (currentTab) {
-                "triage" -> TriageScreen(
-                    viewModel = viewModel,
-                    onEscalateClick = { currentTab = "telehealth" },
-                    onNavigateToTab = { currentTab = it },
-                    onLhrClick = { showLhrDialog = true },
-                    onSafetyCenterClick = { showClinicalSafetyDialog = true },
-                    onSpeak = onSpeak,
-                    onStopSpeaking = onStopSpeaking
-                )
-                "specialists" -> SpecialistsScreen(viewModel = viewModel)
-                "telehealth" -> TelehealthScreen(viewModel = viewModel)
-                "referral" -> ReferralScreen(viewModel = viewModel)
-                "insurance" -> InsuranceScreen(viewModel = viewModel)
-                "fund" -> FundScreen(viewModel = viewModel)
-                "admin" -> AdminPanelScreen(viewModel = viewModel)
-            }
 
-            if (showLhrDialog) {
-                LhrDialog(
-                    triages = triages,
-                    onDismiss = { showLhrDialog = false }
-                )
-            }
+        if (showClinicalSafetyDialog) {
+            ClinicalSafetyDialog(
+                viewModel = viewModel,
+                onDismiss = { showClinicalSafetyDialog = false }
+            )
+        }
 
-            if (showClinicalSafetyDialog) {
-                ClinicalSafetyDialog(
-                    viewModel = viewModel,
-                    onDismiss = { showClinicalSafetyDialog = false }
-                )
-            }
-
-            if (showInvestorDeckDialog) {
-                InvestorPresentationDialog(
-                    onDismiss = { showInvestorDeckDialog = false }
-                )
-            }
+        if (showInvestorDeckDialog) {
+            InvestorPresentationDialog(
+                onDismiss = { showInvestorDeckDialog = false }
+            )
+        }
+        
+        // Dynamic Pop-up Alert Dialog for Urgent Escalation
+        if (urgentEscalation != null) {
+            AlertDialog(
+                onDismissRequest = { /* Force reading/acknowledgement or GP Telehealth action */ },
+                icon = { Icon(Icons.Default.Warning, contentDescription = "Critical Alert", tint = Color(0xFFDC2626), modifier = Modifier.size(36.dp)) },
+                title = { Text("🚨 CLINICAL ACTION REQUIRED", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFDC2626)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "CareOS Medical Core has flagged the following symptom record as requiring IMMEDIATE physician evaluation to prevent clinical delay or complications:",
+                            fontSize = 11.sp,
+                            color = Color(0xFF0F172A)
+                        )
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+                            border = BorderStroke(1.dp, Color(0xFFFCA5A5))
+                        ) {
+                            Text(
+                                text = urgentEscalation ?: "",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF991B1B),
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                        Text(
+                            text = "Please connect to our active Duty GP on live telehealth instantly, or present to LUTH ER directly.",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF475569)
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            currentTab = "telehealth"
+                            viewModel.clearUrgentEscalation()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                    ) {
+                        Text("Connect Telehealth Now", fontSize = 11.sp)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.clearUrgentEscalation() }) {
+                        Text("Acknowledge & Close", color = Color.Gray, fontSize = 11.sp)
+                    }
+                }
+            )
         }
     }
 }
@@ -183,17 +378,23 @@ fun CareOSTopBar(
     CenterAlignedTopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("CareOS", fontWeight = FontWeight.Black, fontSize = 20.sp, letterSpacing = (-0.5).sp, color = Color.White)
+                Text(
+                    text = "CareOS Concierge",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    letterSpacing = (-0.5).sp,
+                    color = Color.White
+                )
                 if (activeInsurance != null) {
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFF0D9488), RoundedCornerShape(100.dp))
+                            .background(Color(0xFFD9F3EE), RoundedCornerShape(100.dp))
                             .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "NHIA APPROVED ✓",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F766E),
+                            fontWeight = FontWeight.ExtraBold,
                             fontSize = 8.sp
                         )
                     }
@@ -202,17 +403,29 @@ fun CareOSTopBar(
         },
         actions = {
             IconButton(onClick = onAdminClick, modifier = Modifier.testTag("admin_top_button")) {
-                Icon(imageVector = Icons.Default.Settings, contentDescription = "Admin Control Hub", tint = if (currentTab == "admin") Color(0xFF6366F1) else Color(0xFF94A3B8))
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Admin Control Hub",
+                    tint = if (currentTab == "admin") Color.White else Color.White.copy(alpha = 0.6f)
+                )
             }
             IconButton(onClick = onInvestorDeckClick, modifier = Modifier.testTag("investor_deck_button")) {
-                Icon(imageVector = Icons.Default.TrendingUp, contentDescription = "Investor Presentation Deck", tint = Color(0xFFF43F5E))
+                Icon(
+                    imageVector = Icons.Default.TrendingUp,
+                    contentDescription = "Investor Presentation Deck",
+                    tint = Color(0xFFFCA5A5)
+                )
             }
             IconButton(onClick = onLhrClick, modifier = Modifier.testTag("lhr_button")) {
-                Icon(imageVector = Icons.Default.FolderShared, contentDescription = "Longitudinal Health Record", tint = Color(0xFF0EA5E9))
+                Icon(
+                    imageVector = Icons.Default.FolderShared,
+                    contentDescription = "Longitudinal Health Record",
+                    tint = Color(0xFFD9F3EE)
+                )
             }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = Color(0xFF0F172A)
+            containerColor = Color(0xFF0F766E)
         )
     )
 }
@@ -223,21 +436,24 @@ fun CareOSBottomNavigation(
     onTabSelect: (String) -> Unit
 ) {
     val tabColors = mapOf(
-        "triage" to Color(0xFF0D9488),       // Teal
-        "specialists" to Color(0xFFEC4899),  // Fuchsia Pink for Specialists
-        "telehealth" to Color(0xFF0EA5E9),   // Sky Blue
-        "referral" to Color(0xFF8B5CF6),     // Royal Purple
-        "insurance" to Color(0xFFF59E0B),    // Amber Gold
-        "fund" to Color(0xFFF43F5E),         // Crimson Rose
-        "admin" to Color(0xFF6366F1)         // Indigo
+        "triage" to Color(0xFF0F766E),       // Primary deep teal
+        "scan" to Color(0xFF14B8A6),         // Symptom Scan soft teal
+        "specialists" to Color(0xFFEC4899),  // Specialists pink
+        "telehealth" to Color(0xFF14B8A6),   // Secondary soft teal
+        "referral" to Color(0xFF6366F1),     // Indigo
+        "insurance" to Color(0xFF0D9488),    // Clean teal
+        "fund" to Color(0xFF16A34A),         // Green success
+        "admin" to Color(0xFF475569)         // Muted Slate
     )
 
     NavigationBar(
         modifier = Modifier.testTag("bottom_nav"),
-        containerColor = Color(0xFF0F172A) // Sleek slate-900 high contrast container
+        containerColor = Color.White,
+        tonalElevation = 8.dp
     ) {
         val items = listOf(
             Triple("triage", "Triage", Icons.Default.MedicalServices),
+            Triple("scan", "Scan", Icons.Default.CameraAlt),
             Triple("specialists", "Specialists", Icons.Default.Group),
             Triple("telehealth", "Consult", Icons.Default.Chat),
             Triple("referral", "Referrals", Icons.Default.Assignment),
@@ -247,7 +463,7 @@ fun CareOSBottomNavigation(
         )
         items.forEach { (tab, label, icon) ->
             val isActive = currentTab == tab
-            val activeColor = tabColors[tab] ?: Color(0xFF0D9488)
+            val activeColor = tabColors[tab] ?: Color(0xFF0F766E)
             
             NavigationBarItem(
                 selected = isActive,
@@ -256,21 +472,21 @@ fun CareOSBottomNavigation(
                     Icon(
                         imageVector = icon, 
                         contentDescription = label,
-                        tint = if (isActive) Color.White else activeColor.copy(alpha = 0.6f)
+                        tint = if (isActive) Color.White else activeColor.copy(alpha = 0.5f)
                     ) 
                 },
                 label = { 
                     Text(
                         text = label, 
                         fontSize = 9.sp, 
-                        fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
-                        color = if (isActive) activeColor else Color(0xFF94A3B8)
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isActive) activeColor else Color(0xFF64748B)
                     ) 
                 },
                 colors = NavigationBarItemDefaults.colors(
                     indicatorColor = activeColor,
                     selectedIconColor = Color.White,
-                    unselectedIconColor = activeColor.copy(alpha = 0.6f)
+                    unselectedIconColor = activeColor.copy(alpha = 0.5f)
                 ),
                 modifier = Modifier.testTag("nav_item_$tab")
             )
@@ -939,15 +1155,26 @@ fun BentoGridDashboard(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFFF8FBFA), // Soft luxury ivory
+                        Color(0xFFF1F5F4), // Muted alt surface
+                        Color(0xFFFFFFFF)  // Light highlights
+                    )
+                )
+            )
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Top Country Gateways Selector
         RegionSelector(
             selectedCountry = selectedCountry,
             onCountrySelected = { viewModel.setSelectedCountry(it) }
         )
 
+        // Active country optimization dashboard panel
         when (selectedCountry) {
             "Universal" -> UniversalWelcomeCard()
             "Nigeria" -> NigeriaOptimizationPanel(viewModel = viewModel)
@@ -960,23 +1187,223 @@ fun BentoGridDashboard(
             "Australia" -> AustraliaOptimizationPanel(viewModel = viewModel)
         }
 
-        Text("QUICK ACTION PORTALS", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Gray)
+        // Luxurious Healthcare Concierge Hero Section (AI Entry Focus)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("concierge_hero_card"),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            border = BorderStroke(1.dp, Color(0xFFDCE7E5))
+        ) {
+            Column(
+                modifier = Modifier
+                    .background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = listOf(Color(0xFF0F766E), Color(0xFF14B8A6))
+                        )
+                    )
+                    .padding(22.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "CAREOS PRIVATE HEALTH CONCIERGE",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            color = Color(0xFFD9F3EE),
+                            letterSpacing = 1.2.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Personalized AI Care",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 22.sp,
+                            color = Color.White,
+                            lineHeight = 28.sp
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("✨", fontSize = 20.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Welcome to your premium private health suite. Our secure, medical-grade AI is fully optimized to manage conservative symptom triage, document processing, and coordinate immediate specialist support.",
+                    fontSize = 11.5.sp,
+                    color = Color(0xFFE2F1EE),
+                    lineHeight = 17.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { onSymptomIntakeClick() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("🩺", fontSize = 14.sp)
+                        Text(
+                            text = "Consult AI Concierge Now",
+                            color = Color(0xFF0F766E),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                        Text("➔", color = Color(0xFF0F766E), fontSize = 12.sp)
+                    }
+                }
+            }
+        }
 
-        // Row 1
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "EXECUTIVE CARE CLINIC DIRECTORY",
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.5.sp,
+            color = Color(0xFF475569),
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+        )
+
+        // Row 1 - Symptom Intake and Visual Scanner
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Card(
                 modifier = Modifier
-                    .weight(1.5f)
-                    .height(130.dp)
+                    .weight(1.3f)
+                    .height(140.dp)
                     .clickable { onSymptomIntakeClick() }
                     .testTag("symptom_intake_card"),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
-                border = BorderStroke(1.5.dp, Color(0xFF86EFAC))
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFDCE7E5)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(text = "🩺", fontSize = 24.sp)
-                    Text("Symptom Intake", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF166534))
-                    Text("Run dynamic, conservative AI symptom triage.", fontSize = 10.sp, color = Color(0xFF14532D))
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "🩺", fontSize = 26.sp)
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFE6F4F1), CircleShape)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text("Active", fontSize = 8.sp, color = Color(0xFF0F766E), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Symptom Intake",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.5.sp,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Run dynamic conservative AI clinical triage.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF475569),
+                            lineHeight = 13.sp
+                        )
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(140.dp)
+                    .clickable { onVisualScanClick() }
+                    .testTag("visual_scan_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFDCE7E5)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "📸", fontSize = 26.sp)
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Visual Scan",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.5.sp,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Malaria packs, skin scans & OCR.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF475569),
+                            lineHeight = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // Row 2 - Tele-Consult and Health Records
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(130.dp)
+                    .clickable { onTalkToDoctorClick() }
+                    .testTag("consult_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFDCE7E5)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "💬", fontSize = 26.sp)
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Tele-Consult",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Instant GP secure handoff.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF475569)
+                        )
+                    }
                 }
             }
 
@@ -984,63 +1411,49 @@ fun BentoGridDashboard(
                 modifier = Modifier
                     .weight(1f)
                     .height(130.dp)
-                    .clickable { onVisualScanClick() }
-                    .testTag("visual_scan_card"),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F3FF)),
-                border = BorderStroke(1.5.dp, Color(0xFFDDD6FE))
-            ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(text = "📸", fontSize = 24.sp)
-                    Text("Visual Scan", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF5B21B6))
-                    Text("Malaria packs, skin rashes & document OCR.", fontSize = 10.sp, color = Color(0xFF4C1D95))
-                }
-            }
-        }
-
-        // Row 2
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(120.dp)
-                    .clickable { onTalkToDoctorClick() }
-                    .testTag("consult_card"),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
-                border = BorderStroke(1.5.dp, Color(0xFFBFDBFE))
-            ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "💬", fontSize = 24.sp)
-                    Text("Tele-Consult", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF1E40AF))
-                    Text("Instant GP handoff & chat backup.", fontSize = 9.5.sp, color = Color(0xFF1E3A8A))
-                }
-            }
-
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(120.dp)
                     .clickable { onHealthRecordClick() }
                     .testTag("health_record_card"),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF7ED)),
-                border = BorderStroke(1.5.dp, Color(0xFFFFEDD5))
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFDCE7E5)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "📁", fontSize = 24.sp)
-                    Text("Health Records", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFFC2410C))
-                    Text("Longitudinal Health Records.", fontSize = 9.5.sp, color = Color(0xFF7C2D12))
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "📁", fontSize = 26.sp)
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Health Records",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = "Longitudinal health ledgers.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF475569)
+                        )
+                    }
                 }
             }
         }
 
-        // Row 3
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Row 3 - HMO Wallet and Medical Aid
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Card(
                 modifier = Modifier
                     .weight(1f)
                     .height(100.dp)
                     .clickable { onInsuranceClick() },
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5)),
-                border = BorderStroke(1.dp, Color(0xFFA7F3D0))
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFDCE7E5)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -1053,9 +1466,9 @@ fun BentoGridDashboard(
                         Text(text = "🛡️", fontSize = 24.sp)
                         Text(
                             text = "HMO Wallet",
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1E293B)
+                            color = Color(0xFF0F172A)
                         )
                     }
                 }
@@ -1066,8 +1479,10 @@ fun BentoGridDashboard(
                     .weight(1f)
                     .height(100.dp)
                     .clickable { onMedicalAidClick() },
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
-                border = BorderStroke(1.dp, Color(0xFFFCA5A5))
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFDCE7E5)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -1080,9 +1495,9 @@ fun BentoGridDashboard(
                         Text(text = "🤝", fontSize = 24.sp)
                         Text(
                             text = "Medical Aid",
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1E293B)
+                            color = Color(0xFF0F172A)
                         )
                     }
                 }
@@ -1091,10 +1506,13 @@ fun BentoGridDashboard(
 
         // Clinical Safety Board Action Card
         Card(
-            modifier = Modifier.fillMaxWidth().clickable { onSafetyCenterClick() }.testTag("clinical_safety_center_button"),
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onSafetyCenterClick() }
+                .testTag("clinical_safety_center_button"),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
-            border = BorderStroke(1.5.dp, Color(0xFFFCA5A5))
+            border = BorderStroke(1.dp, Color(0xFFFCA5A5))
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),
@@ -1102,69 +1520,109 @@ fun BentoGridDashboard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Box(
-                    modifier = Modifier.size(44.dp).clip(CircleShape).background(Color(0xFFFEE2E2)),
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFEE2E2)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "🛡️", fontSize = 20.sp)
+                    Text(text = "🛡️", fontSize = 18.sp)
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Clinical Safety & Governance Board",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         color = Color(0xFF991B1B)
                     )
                     Text(
                         text = "SaMD compliance v4.2.1 • Audit logs, Adverse reports & Peer doctor override active.",
-                        fontSize = 10.sp,
+                        fontSize = 9.5.sp,
                         color = Color(0xFF7F1D1D)
                     )
                 }
-                Text(text = "➔", fontSize = 16.sp, color = Color(0xFF991B1B))
+                Text(text = "➔", fontSize = 15.sp, color = Color(0xFF991B1B))
             }
         }
 
         // Clinical Follow-up Reminders section (as requested: "Follow-up reminders continue after the visit")
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            border = BorderStroke(1.dp, Color(0xFFDCE7E5)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "⏰ ACTIVE PROTOCOL REMINDERS",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    color = Color(0xFF475569)
-                )
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "⏰ ACTIVE TREATMENT PROTOCOLS",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.5.sp,
+                        color = Color(0xFF475569),
+                        letterSpacing = 0.5.sp
+                    )
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFEFF6FF), CircleShape)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "${followUpReminders.count { !it.isCompleted }} pending",
+                            fontSize = 8.sp,
+                            color = Color(0xFF1D4ED8),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
                 if (followUpReminders.isEmpty()) {
-                    Text("No outstanding treatment follow-ups.", fontSize = 11.sp, color = Color.Gray)
+                    Text(
+                        text = "No outstanding clinical follow-ups. You are fully up to date with your recovery program.",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        lineHeight = 15.sp
+                    )
                 } else {
                     followUpReminders.forEach { r ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth().clickable { onToggleReminder(r.id) }
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onToggleReminder(r.id) }
+                                .padding(vertical = 4.dp, horizontal = 2.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f)
+                             ) {
                                 Checkbox(
                                     checked = r.isCompleted,
-                                    onCheckedChange = { onToggleReminder(r.id) }
+                                    onCheckedChange = { onToggleReminder(r.id) },
+                                    colors = CheckboxDefaults.colors(checkedColor = Color(0xFF0F766E))
                                 )
                                 Column {
                                     Text(
                                         text = r.text,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (r.isCompleted) Color.Gray else Color.Black
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (r.isCompleted) Color(0xFF94A3B8) else Color(0xFF0F172A)
                                     )
                                     Text(
-                                        text = "${r.category.uppercase()} • ${r.scheduledTime}",
+                                        text = "${r.category.uppercase()} • Scheduled: ${r.scheduledTime}",
                                         fontSize = 9.sp,
-                                        color = Color.Gray
+                                        color = Color(0xFF64748B)
                                     )
                                 }
                             }
@@ -1744,27 +2202,61 @@ fun TriageScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(10.dp),
+                        .background(Color.White)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Photo button
-                    IconButton(onClick = { showCameraScanner = true }, modifier = Modifier.testTag("photo_button")) {
-                        Icon(imageVector = Icons.Default.PhotoCamera, contentDescription = "Add Photo Scan")
+                    IconButton(
+                        onClick = { showCameraScanner = true },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFFF1F5F4), CircleShape)
+                            .testTag("photo_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = "Add Photo Scan",
+                            tint = Color(0xFF0F766E),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
 
                     // Voice button
-                    IconButton(onClick = { showVoiceRecordDialog = true }, modifier = Modifier.testTag("voice_button")) {
-                        Icon(imageVector = Icons.Default.Mic, contentDescription = "Record Voice Note")
+                    IconButton(
+                        onClick = { showVoiceRecordDialog = true },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFFF1F5F4), CircleShape)
+                            .testTag("voice_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Record Voice Note",
+                            tint = Color(0xFF0F766E),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
 
                     OutlinedTextField(
                         value = textInput,
                         onValueChange = { textInput = it },
-                        placeholder = { Text("Describe clinical symptoms...") },
-                        modifier = Modifier.weight(1f).testTag("triage_input"),
+                        placeholder = { Text("Describe clinical symptoms...", fontSize = 13.sp, color = Color(0xFF475569)) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("triage_input"),
                         maxLines = 3,
-                        singleLine = false
+                        singleLine = false,
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color(0xFFF1F5F4),
+                            unfocusedContainerColor = Color(0xFFF8FBFA),
+                            focusedBorderColor = Color(0xFF0F766E),
+                            unfocusedBorderColor = Color(0xFFDCE7E5),
+                            cursorColor = Color(0xFF0F766E)
+                        ),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.5.sp, color = Color(0xFF0F172A))
                     )
 
                     IconButton(
@@ -1774,9 +2266,17 @@ fun TriageScreen(
                                 textInput = ""
                             }
                         },
-                        modifier = Modifier.testTag("send_button")
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFF0F766E), CircleShape)
+                            .testTag("send_button")
                     ) {
-                        Icon(imageVector = Icons.Default.Send, contentDescription = "Send Message", tint = MaterialTheme.colorScheme.primary)
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = "Send Message",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
@@ -1815,47 +2315,76 @@ fun TriageChatBubble(
 ) {
     val isUser = msg.sender == "user"
     Box(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
     ) {
         Card(
             shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 2.dp,
-                bottomEnd = if (isUser) 2.dp else 16.dp
+                topStart = 20.dp,
+                topEnd = 20.dp,
+                bottomStart = if (isUser) 20.dp else 4.dp,
+                bottomEnd = if (isUser) 4.dp else 20.dp
             ),
             colors = CardDefaults.cardColors(
-                containerColor = if (isUser) Color(0xFF006B5A) else Color(0xFFF1F5F9)
+                containerColor = if (isUser) Color(0xFF0F766E) else Color.White
             ),
-            border = BorderStroke(1.dp, if (isUser) Color(0xFF004D40) else Color(0xFFE2E8F0)),
-            modifier = Modifier.widthIn(max = 290.dp)
+            border = BorderStroke(1.dp, if (isUser) Color(0xFF115E59) else Color(0xFFDCE7E5)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            modifier = Modifier.widthIn(max = 310.dp)
         ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (!isUser) {
+                    // Luxurious, calming clinical credential badge
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    ) {
+                        Text(
+                            text = "🛡️ CareOS Clinical Concierge",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F766E),
+                            letterSpacing = 0.5.sp
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF16A34A))
+                        )
+                    }
+                }
+
                 if (msg.imageUri != null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(140.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.DarkGray),
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFF1F5F4)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("📷 Photo Attachment", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("📷 Photo Attachment Included", color = Color(0xFF0F766E), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                 }
                 
                 Text(
                     text = msg.text,
-                    fontSize = 15.sp,
+                    fontSize = 14.5.sp,
                     fontWeight = FontWeight.Medium,
                     color = if (isUser) Color.White else Color(0xFF0F172A),
                     lineHeight = 21.sp
                 )
 
                 if (!isUser) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Button(
                         onClick = {
                             if (isCurrentlySpeaking) {
@@ -1866,10 +2395,10 @@ fun TriageChatBubble(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isCurrentlySpeaking) Color(0xFFEF4444) else Color(0xFF0D9488)
+                            containerColor = if (isCurrentlySpeaking) Color(0xFFDC2626) else Color(0xFFD9F3EE)
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.align(Alignment.Start)
                     ) {
                         Row(
@@ -1879,14 +2408,14 @@ fun TriageChatBubble(
                             Icon(
                                 imageVector = if (isCurrentlySpeaking) Icons.Default.Stop else Icons.Default.PlayArrow,
                                 contentDescription = if (isCurrentlySpeaking) "Stop Replay" else "Play Audio Out Loud",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+                                tint = if (isCurrentlySpeaking) Color.White else Color(0xFF0F766E),
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = if (isCurrentlySpeaking) "STOP REPLAY" else "🔊 READ ALOUD",
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = if (isCurrentlySpeaking) Color.White else Color(0xFF0F766E)
                             )
                         }
                     }
@@ -4282,7 +4811,7 @@ fun SpecialistsScreen(viewModel: CareViewModel) {
 // --- SCREEN 5: REFERRAL SCREEN ---
 @Composable
 fun ReferralScreen(viewModel: CareViewModel) {
-    val referrals by viewModel.allReferrals.collectAsState()
+    val referrals by viewModel.isolatedReferrals.collectAsState()
     var showFhirPayloadForReferralId by remember { mutableStateOf<Long?>(null) }
 
     Column(
@@ -7845,6 +8374,746 @@ fun AdminPanelScreen(viewModel: CareViewModel) {
             }
         }
     }
+}
+
+
+// ==========================================
+// --- SECURE CLINICAL AUTHENTICATION GATE SCREEN ---
+// ==========================================
+@Composable
+fun CareOSAuthScreen(viewModel: CareViewModel) {
+    var isSignUpMode by remember { mutableStateOf(false) }
+    var email by remember { mutableStateOf("demo@careos.org") }
+    var password by remember { mutableStateOf("password123") }
+    var fullName by remember { mutableStateOf("Simeon Adebayo") }
+    var hmoMemberId by remember { mutableStateOf("NHIA-NIG-7734") }
+    
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var successMessage by remember { mutableStateOf<String?>(null) }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8FBFA))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 420.dp)
+                .background(Color.White, RoundedCornerShape(24.dp))
+                .border(1.dp, Color(0xFFDCE7E5), RoundedCornerShape(24.dp))
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(Color(0xFFD9F3EE), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Security,
+                    contentDescription = "Encrypted Vault Logo",
+                    tint = Color(0xFF0F766E),
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+            
+            Text(
+                text = "CareOS Secure Clinic Portal",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
+            )
+            
+            Text(
+                text = if (isSignUpMode) "Enroll in Nigeria's private health network with clinical-grade ledger security." else "Decrypt and access your secure medical data vaults.",
+                fontSize = 11.sp,
+                color = Color(0xFF475569),
+                textAlign = TextAlign.Center,
+                lineHeight = 16.sp
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            if (errorMessage != null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEE2E2)),
+                    border = BorderStroke(1.dp, Color(0xFFFCA5A5)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = errorMessage ?: "",
+                        color = Color(0xFF991B1B),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
+            if (successMessage != null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFDCFCE7)),
+                    border = BorderStroke(1.dp, Color(0xFF86EFAC)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = successMessage ?: "",
+                        color = Color(0xFF166534),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
+            if (isSignUpMode) {
+                OutlinedTextField(
+                    value = fullName,
+                    onValueChange = { fullName = it },
+                    label = { Text("Patient Full Name") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF0F766E)) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF0F766E),
+                        focusedLabelColor = Color(0xFF0F766E)
+                    ),
+                    modifier = Modifier.fillMaxWidth().testTag("auth_name_field")
+                )
+                
+                OutlinedTextField(
+                    value = hmoMemberId,
+                    onValueChange = { hmoMemberId = it },
+                    label = { Text("NHIA / HMO Member ID (Optional)") },
+                    leadingIcon = { Icon(Icons.Default.CardMembership, contentDescription = null, tint = Color(0xFF14B8A6)) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF0F766E),
+                        focusedLabelColor = Color(0xFF0F766E)
+                    ),
+                    modifier = Modifier.fillMaxWidth().testTag("auth_hmo_field")
+                )
+            }
+            
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Secure Email Address") },
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF0F766E)) },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF0F766E),
+                    focusedLabelColor = Color(0xFF0F766E)
+                ),
+                modifier = Modifier.fillMaxWidth().testTag("auth_email_field")
+            )
+            
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Clinical Access Password") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF0F766E)) },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF0F766E),
+                    focusedLabelColor = Color(0xFF0F766E)
+                ),
+                modifier = Modifier.fillMaxWidth().testTag("auth_password_field")
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Button(
+                onClick = {
+                    isLoading = true
+                    errorMessage = null
+                    successMessage = null
+                    if (isSignUpMode) {
+                        viewModel.signUpPatient(email, password, fullName, hmoMemberId) { success, err ->
+                            isLoading = false
+                            if (success) {
+                                if (err != null) {
+                                    successMessage = err
+                                }
+                            } else {
+                                errorMessage = err ?: "Sign Up Failed"
+                            }
+                        }
+                    } else {
+                        viewModel.loginPatient(email, password) { success, err ->
+                            isLoading = false
+                            if (success) {
+                                if (err != null) {
+                                    successMessage = err
+                                }
+                            } else {
+                                errorMessage = err ?: "Login Failed. Check credentials."
+                            }
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("auth_submit_button"),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text(
+                        text = if (isSignUpMode) "Create Enrolled Identity" else "Authenticate & Access Vault",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            // Quick bypass demo button
+            Button(
+                onClick = {
+                    isLoading = true
+                    errorMessage = null
+                    successMessage = null
+                    viewModel.loginPatient("demo@careos.org", "password123") { success, err ->
+                        isLoading = false
+                        if (success) {
+                            if (err != null) {
+                                successMessage = err
+                            }
+                        } else {
+                            errorMessage = err ?: "Login Failed. Check credentials."
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14B8A6)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .testTag("auth_demo_button"),
+                enabled = !isLoading
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MedicalServices,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "One-Click Quick Demo Access",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+            
+            TextButton(
+                onClick = {
+                    isSignUpMode = !isSignUpMode
+                    errorMessage = null
+                    successMessage = null
+                },
+                modifier = Modifier.testTag("auth_mode_toggle")
+            ) {
+                Text(
+                    text = if (isSignUpMode) "Already verified? Authenticate here" else "New patient? Establish secure enrollment profile",
+                    color = Color(0xFF0F766E),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            
+            Divider(color = Color(0xFFE2E8F0), thickness = 1.dp)
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = Color(0xFF14B8A6),
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "NDPR Clinical Grade Cryptographic Vault Locked",
+                    fontSize = 8.5.sp,
+                    color = Color(0xFF94A3B8),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+
+// ==========================================
+// --- SYMPTOM SCANNERS & CAMERA INTERFACE SCREEN ---
+// ==========================================
+@Composable
+fun SymptomScanScreen(viewModel: CareViewModel, onStartTriageClick: () -> Unit) {
+    var activeScanMode by remember { mutableStateOf("Dermatology") }
+    var zoomLevel by remember { mutableStateOf("1x") }
+    var isFlashOn by remember { mutableStateOf(false) }
+    var isScanningActive by remember { mutableStateOf(false) }
+    
+    val selectedImageUri by viewModel.selectedImageUri.collectAsState()
+    
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val bytes = inputStream?.readBytes()
+                if (bytes != null) {
+                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.DEFAULT)
+                    val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+                    viewModel.selectImage(base64, mimeType, uri.toString())
+                }
+            } catch (e: Exception) {
+                // error logging
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("symptom_scan_screen")
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFD9F3EE)),
+            border = BorderStroke(1.dp, Color(0xFF14B8A6)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(Color(0xFF0F766E), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("AI-ASSISTED CLINICAL VISUAL SCANS", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF0F766E))
+                    Text("Capture high-fidelity physical symptom photographs to power localized digital medical triage.", fontSize = 10.sp, color = Color(0xFF115E59))
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color.Black),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(280.dp)
+                .testTag("camera_viewfinder")
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (selectedImageUri != null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "📸 PHOTO CAPTURED AT CLINICAL RESOLUTION",
+                            color = Color(0xFF14B8A6),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .border(2.dp, Color(0xFF14B8A6), RoundedCornerShape(20.dp))
+                        )
+                    }
+                } else {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val w = size.width
+                        val h = size.height
+                        
+                        drawCircle(color = Color(0xFF14B8A6).copy(alpha = 0.3f), radius = 60f, center = center)
+                        drawLine(color = Color(0xFF14B8A6), start = androidx.compose.ui.geometry.Offset(center.x - 30, center.y), end = androidx.compose.ui.geometry.Offset(center.x + 30, center.y), strokeWidth = 2f)
+                        drawLine(color = Color(0xFF14B8A6), start = androidx.compose.ui.geometry.Offset(center.x, center.y - 30), end = androidx.compose.ui.geometry.Offset(center.x, center.y + 30), strokeWidth = 2f)
+
+                        val bracketLen = 40f
+                        val pad = 30f
+                        drawLine(color = Color.White, start = androidx.compose.ui.geometry.Offset(pad, pad), end = androidx.compose.ui.geometry.Offset(pad + bracketLen, pad), strokeWidth = 4f)
+                        drawLine(color = Color.White, start = androidx.compose.ui.geometry.Offset(pad, pad), end = androidx.compose.ui.geometry.Offset(pad, pad + bracketLen), strokeWidth = 4f)
+                        drawLine(color = Color.White, start = androidx.compose.ui.geometry.Offset(w - pad, pad), end = androidx.compose.ui.geometry.Offset(w - pad - bracketLen, pad), strokeWidth = 4f)
+                        drawLine(color = Color.White, start = androidx.compose.ui.geometry.Offset(w - pad, pad), end = androidx.compose.ui.geometry.Offset(w - pad, pad + bracketLen), strokeWidth = 4f)
+                        drawLine(color = Color.White, start = androidx.compose.ui.geometry.Offset(pad, h - pad), end = androidx.compose.ui.geometry.Offset(pad + bracketLen, h - pad), strokeWidth = 4f)
+                        drawLine(color = Color.White, start = androidx.compose.ui.geometry.Offset(pad, h - pad), end = androidx.compose.ui.geometry.Offset(pad, h - pad - bracketLen), strokeWidth = 4f)
+                        drawLine(color = Color.White, start = androidx.compose.ui.geometry.Offset(w - pad, h - pad), end = androidx.compose.ui.geometry.Offset(w - pad - bracketLen, h - pad), strokeWidth = 4f)
+                        drawLine(color = Color.White, start = androidx.compose.ui.geometry.Offset(w - pad, h - pad), end = androidx.compose.ui.geometry.Offset(w - pad, h - pad - bracketLen), strokeWidth = 4f)
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(12.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "MODE: ACTIVE ${activeScanMode.uppercase()} SCALING",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+
+                    Text(
+                        text = "ALIGN LESION INSIDE CENTER RETICLE",
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp),
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("SCANNER CAPTURE CONFIGURATION", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Gray)
+                
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Capture Mode:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf("Dermatology", "Ophthalmic", "Oral/ENT").forEach { mode ->
+                            val isActive = activeScanMode == mode
+                            Box(
+                                modifier = Modifier
+                                    .background(if (isActive) Color(0xFF0F766E) else Color(0xFFF1F5F4), RoundedCornerShape(8.dp))
+                                    .clickable { activeScanMode = mode }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = mode,
+                                    fontSize = 10.sp,
+                                    color = if (isActive) Color.White else Color(0xFF475569),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Optical Zoom:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("1x", "2x", "5x").forEach { z ->
+                            val isActive = zoomLevel == z
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(if (isActive) Color(0xFF14B8A6) else Color(0xFFF1F5F4), CircleShape)
+                                    .clickable { zoomLevel = z }
+                                    .padding(4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = z,
+                                    fontSize = 9.sp,
+                                    color = if (isActive) Color.White else Color(0xFF475569),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("LED Flash Diagnostic:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Switch(
+                        checked = isFlashOn,
+                        onCheckedChange = { isFlashOn = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFF0F766E)
+                        )
+                    )
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FBFA)),
+            border = BorderStroke(1.dp, Color(0xFFDCE7E5)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("CLINICAL SYMPTOM SIMULATOR CASES", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF0F766E))
+                Text("Simulate a high-resolution photograph upload or select from preset medical scenarios for rapid testing:", fontSize = 10.sp, color = Color(0xFF475569))
+                
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(
+                        onClick = {
+                            viewModel.selectImage(
+                                base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                                mimeType = "image/png",
+                                uriString = "android.resource://com.example/drawable/ic_simulated_rash"
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF0F766E)),
+                        border = BorderStroke(1.dp, Color(0xFF0F766E)),
+                        modifier = Modifier.fillMaxWidth().height(36.dp).testTag("sim_rash_button")
+                    ) {
+                        Text("Simulate Ocular Redness & Swelling Scan", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = {
+                            viewModel.selectImage(
+                                base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                                mimeType = "image/png",
+                                uriString = "android.resource://com.example/drawable/ic_simulated_lesion"
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF0F766E)),
+                        border = BorderStroke(1.dp, Color(0xFF0F766E)),
+                        modifier = Modifier.fillMaxWidth().height(36.dp).testTag("sim_lesion_button")
+                    ) {
+                        Text("Simulate Dermatology Skin Lesion Scan", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = { imagePickerLauncher.launch("image/*") },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14B8A6)),
+                        modifier = Modifier.fillMaxWidth().height(36.dp).testTag("select_file_button")
+                    ) {
+                        Icon(Icons.Default.Upload, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Upload Photo from local Device library", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (selectedImageUri != null) {
+                Button(
+                    onClick = { viewModel.clearImage() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                    modifier = Modifier.weight(1f).height(46.dp)
+                ) {
+                    Text("Discard", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+
+                Button(
+                    onClick = {
+                        onStartTriageClick()
+                        viewModel.sendTriageMessage("I have uploaded a symptom photograph for AI clinical visual triage.")
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    modifier = Modifier.weight(1.5f).height(46.dp).testTag("start_ai_triage_photo")
+                ) {
+                    Text("Analyze with AI Triage", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            } else {
+                Button(
+                    onClick = {
+                        isScanningActive = true
+                        viewModel.selectImage(
+                            base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                            mimeType = "image/png",
+                            uriString = "android.resource://com.example/drawable/ic_simulated_scan_photo"
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    modifier = Modifier.fillMaxWidth().height(48.dp).testTag("capture_shutter_button")
+                ) {
+                    Icon(Icons.Default.Camera, contentDescription = "Capture Button", tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Capture Diagnostic Image", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
+
+// ==========================================
+// --- RESPONSIVE SIDEBAR NAVIGATION COMPOSABLE ---
+// ==========================================
+@Composable
+fun CareOSNavigationSidebar(
+    currentTab: String,
+    onTabSelect: (String) -> Unit,
+    activeInsurance: InsuranceProfile?,
+    onLhrClick: () -> Unit,
+    onInvestorDeckClick: () -> Unit,
+    onAdminClick: () -> Unit,
+    viewModel: CareViewModel
+) {
+    val patientProfile by viewModel.currentPatient.collectAsState()
+    
+    val items = listOf(
+        Triple("triage", "Triage Chat", Icons.Default.MedicalServices),
+        Triple("scan", "Symptom Scan", Icons.Default.CameraAlt),
+        Triple("specialists", "Specialists", Icons.Default.Group),
+        Triple("telehealth", "Consult Live", Icons.Default.Chat),
+        Triple("referral", "Referrals", Icons.Default.Assignment),
+        Triple("insurance", "HMO Profile", Icons.Default.Shield),
+        Triple("fund", "Care Fund", Icons.Default.Handshake)
+    )
+
+    NavigationRail(
+        containerColor = Color(0xFF0F766E),
+        header = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(vertical = 16.dp, horizontal = 12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color.White.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocalHospital,
+                        contentDescription = "Clinic Logo",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "CareOS",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontSize = 15.sp
+                )
+                Text(
+                    text = "CLINICAL AI ENGINE",
+                    color = Color(0xFFD9F3EE),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(130.dp)
+            .testTag("navigation_sidebar"),
+        content = {
+            Column(
+                modifier = Modifier.fillMaxHeight().padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    items.forEach { (tab, label, icon) ->
+                        val isActive = currentTab == tab
+                        NavigationRailItem(
+                            selected = isActive,
+                            onClick = { onTabSelect(tab) },
+                            icon = { Icon(icon, contentDescription = label) },
+                            label = { Text(label, fontSize = 9.sp, maxLines = 1) },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = Color(0xFF0F766E),
+                                selectedTextColor = Color.White,
+                                indicatorColor = Color.White,
+                                unselectedIconColor = Color.White.copy(alpha = 0.6f),
+                                unselectedTextColor = Color.White.copy(alpha = 0.6f)
+                            ),
+                            modifier = Modifier.testTag("sidebar_tab_$tab")
+                        )
+                    }
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    IconButton(onClick = onLhrClick, modifier = Modifier.testTag("sidebar_lhr_btn")) {
+                        Icon(Icons.Default.FolderShared, contentDescription = "LHR", tint = Color(0xFFD9F3EE))
+                    }
+                    IconButton(onClick = onInvestorDeckClick, modifier = Modifier.testTag("sidebar_investor_btn")) {
+                        Icon(Icons.Default.TrendingUp, contentDescription = "Investor Deck", tint = Color(0xFFFCA5A5))
+                    }
+                    IconButton(onClick = onAdminClick, modifier = Modifier.testTag("sidebar_admin_btn")) {
+                        Icon(Icons.Default.Settings, contentDescription = "Admin", tint = Color.White)
+                    }
+                    
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    ) {
+                        Text(
+                            text = patientProfile?.fullName?.substringBefore(" ") ?: "Simeon",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = "Log Out",
+                            color = Color(0xFFFCA5A5),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .clickable { viewModel.logoutPatient() }
+                                .padding(vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        }
+    )
 }
 
 
