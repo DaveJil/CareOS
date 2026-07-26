@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.data.DonationRecord
 import com.example.data.PatientRecord
 import com.example.data.PersonalEHR
@@ -8381,7 +8382,788 @@ fun AdminPanelScreen(viewModel: CareViewModel) {
 // --- SECURE CLINICAL AUTHENTICATION GATE SCREEN ---
 // ==========================================
 @Composable
+fun MockDownloadDialog(
+    platformName: String,
+    onDismiss: () -> Unit
+) {
+    var progress by remember { mutableStateOf(0f) }
+    var currentStep by remember { mutableStateOf("Initializing clinical node...") }
+    
+    LaunchedEffect(Unit) {
+        val steps = listOf(
+            "Contacting localized CareOS Clinical CDN...",
+            "Validating cryptographic package signatures...",
+            "Syncing NDPR medical vault libraries...",
+            "Finalizing secure installation package..."
+        )
+        for (i in 1..100) {
+            kotlinx.coroutines.delay(25)
+            progress = i / 100f
+            when (i) {
+                15 -> currentStep = steps[0]
+                40 -> currentStep = steps[1]
+                65 -> currentStep = steps[2]
+                85 -> currentStep = steps[3]
+            }
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(
+                    imageVector = Icons.Default.FileDownload,
+                    contentDescription = null,
+                    tint = Color(0xFF0F766E),
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(
+                    text = "Clinical Downloader",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Preparing $platformName secure deployment...",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF475569),
+                    textAlign = TextAlign.Center
+                )
+                
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                    color = Color(0xFF14B8A6),
+                    trackColor = Color(0xFFD9F3EE)
+                )
+                
+                Text(
+                    text = "${(progress * 100).toInt()}% - $currentStep",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0F766E),
+                    textAlign = TextAlign.Center
+                )
+                
+                if (progress >= 1f) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFDCFCE7)),
+                        border = BorderStroke(1.dp, Color(0xFF86EFAC)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF166534),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Secure signature validated. Ready to host!",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF166534)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(text = if (progress >= 1f) "Finished" else "Cancel", fontSize = 11.sp)
+            }
+        }
+    )
+}
+
+@Composable
+fun CareOSLandingPageScreen(
+    viewModel: CareViewModel,
+    onProceedClick: () -> Unit
+) {
+    var activeBenefitTab by remember { mutableStateOf("patient") } // "patient" or "doctor"
+    var downloadingPlatform by remember { mutableStateOf<String?>(null) }
+    
+    if (downloadingPlatform != null) {
+        MockDownloadDialog(
+            platformName = downloadingPlatform ?: "",
+            onDismiss = { downloadingPlatform = null }
+        )
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF1F5F9))
+            .testTag("landing_page_screen")
+    ) {
+        // 1. HEADER HERO
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(Color(0xFF0F766E), Color(0xFF115E59))
+                        )
+                    )
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color.White, RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MedicalServices,
+                                contentDescription = "CareOS Logo",
+                                tint = Color(0xFF0F766E),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "CareOS",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Clinical Medical Core",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF2DD4BF)
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = onProceedClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14B8A6)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Launch Portal", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Hero Headline
+                Text(
+                    text = "Healthcare That Feels Like Home.",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 30.sp
+                )
+
+                Text(
+                    text = "A clinically-governed health operating system. Chat, scan, consult, and insure under an NDPR-secure medical ledger.",
+                    fontSize = 11.sp,
+                    color = Color(0xFFCCFBF1),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 16.sp
+                )
+
+                // Trust Badges
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("99.4%", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color(0xFF2DD4BF))
+                        Text("Triage Accuracy", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("24/7", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color(0xFF2DD4BF))
+                        Text("Duty Doctors", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Instant", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color(0xFF2DD4BF))
+                        Text("HMO Approval", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Hero Image - Doctor portrait (using Coil AsyncImage)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .border(1.dp, Color(0xFF2DD4BF).copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        AsyncImage(
+                            model = "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=600",
+                            contentDescription = "Doctor",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
+                                    )
+                                )
+                        )
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(modifier = Modifier.size(6.dp).background(Color(0xFF10B981), CircleShape))
+                                Text("Online & Consultative", fontSize = 8.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                            }
+                            Text("Dr. Grace Adeniran, MD", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Primary Care Physician, CareOS Lagos Team", fontSize = 10.sp, color = Color.LightGray)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. THE BEAUTIFUL STORY of SIMEON
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("🚨", fontSize = 20.sp)
+                        Column {
+                            Text(
+                                text = "THE STORY OF SIMEON",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF991B1B)
+                            )
+                            Text(
+                                text = "Emergency Escalation at 11:30 PM",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0F172A)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "It was 11:30 PM in Lagos. Simeon Adebayo woke up with sudden, burning chest tightness. Driving to LUTH ER meant navigating dark streets, and queuing for hours inside a crowded lobby was a painful risk.",
+                        fontSize = 11.sp,
+                        color = Color(0xFF475569),
+                        lineHeight = 16.sp
+                    )
+
+                    // Card inside with photo of smiling happy family representing peace of mind
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(130.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AsyncImage(
+                                model = "https://images.unsplash.com/photo-1512052989961-a0c37d51163b?auto=format&fit=crop&q=80&w=600",
+                                contentDescription = "Smiling family",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
+                                        )
+                                    )
+                            )
+                            Text(
+                                text = "Simeon Adebayo & family, living healthy with absolute peace of mind.",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(8.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Instead, Simeon launched CareOS. He chatted his symptoms in plain language and captured a diagnostic scan. Instantly, the CareOS clinical core identified critical warning signs, generated a standard FHIR referral ticket, pre-authorized his connected HMO, and triggered a direct live telehealth call connecting him to an active Duty GP.",
+                        fontSize = 11.sp,
+                        color = Color(0xFF475569),
+                        lineHeight = 16.sp
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF0FDF4), RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFFBBF7D0), RoundedCornerShape(8.dp))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = "✅ \"CareOS saved my life by bridging the gap instantly between triage advisory, insurance pre-auth, and active doctors.\" — Simeon A.",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF15803D)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 3. CORE FEATURES GRID (Title)
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "WHAT CAREOS CAN DO",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F766E),
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = "Comprehensive Clinical Operating System",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF0F172A),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        // 4. THE FEATURES (List format for beautiful responsive scroll)
+        val features = listOf(
+            Triple("AI Triage Chat", "A highly precise chatbot mapped to clinical protocols. Speaks simple terms, estimates severity, and flags red flags in seconds.", Icons.Default.Chat),
+            Triple("Symptom Visual Scan", "Uses advanced photography tools inside your phone camera to capture clear images of lesions, rashes, and swelling.", Icons.Default.CameraAlt),
+            Triple("24/7 Telehealth Consult", "Instant live audio or video line directly to certified clinical Duty GPs across Nigeria with zero wait times.", Icons.Default.Call),
+            Triple("FHIR Referral Vault", "Drives standard Hospital Referrals automatically for red flags. Decrypts your longitudinal medical history securely.", Icons.Default.FolderShared),
+            Triple("NHIA & HMO Claims", "Link private health insurance or NHIA profiles. Pre-authorize outpatient consults automatically through APIs.", Icons.Default.LocalHospital),
+            Triple("CareOS Mutual Fund", "Community-led health crowdfunding ledger. Transparent payouts directly to validated clinic billing records.", Icons.Default.Handshake)
+        )
+
+        items(features) { feature ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Color(0xFFD9F3EE), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = feature.third,
+                            contentDescription = null,
+                            tint = Color(0xFF0F766E),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = feature.first,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = feature.second,
+                            fontSize = 10.5.sp,
+                            color = Color(0xFF475569),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // 5. BENEFITS SWITCHER TABS
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "UNMATCHED APP BENEFITS",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F766E),
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+
+                // Tab Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                        .padding(4.dp)
+                ) {
+                    Button(
+                        onClick = { activeBenefitTab = "patient" },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (activeBenefitTab == "patient") Color.White else Color.Transparent,
+                            contentColor = if (activeBenefitTab == "patient") Color(0xFF0F766E) else Color(0xFF64748B)
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = if (activeBenefitTab == "patient") 2.dp else 0.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("For Patients", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = { activeBenefitTab = "doctor" },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (activeBenefitTab == "doctor") Color.White else Color.Transparent,
+                            contentColor = if (activeBenefitTab == "doctor") Color(0xFF0F766E) else Color(0xFF64748B)
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = if (activeBenefitTab == "doctor") 2.dp else 0.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("For Practitioners", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (activeBenefitTab == "patient") {
+                            listOf(
+                                "Zero Clinic Delays: Instant triage determinations in seconds.",
+                                "Personal Secure Vault: Total NDPR control over your health records.",
+                                "Linked HMO claims: Skip claims lines; outpatient fees covered automatically.",
+                                "Community Crowdfunding: Secure local help for outstanding bill deficits."
+                            ).forEach { bullet ->
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(bullet, fontSize = 10.5.sp, color = Color(0xFF334155))
+                                }
+                            }
+                        } else {
+                            listOf(
+                                "Onboard Private Practice: Join Nigeria's premier private specialist catalog.",
+                                "Competitive Cross-Border Payouts: Work remotely, earning in global currencies.",
+                                "AI Clinician Assistants: Feed a custom AI with your medical logic to screen clients.",
+                                "FHIR EHR Ledger Sync: Read validated patient medical records upon explicit consent."
+                            ).forEach { bullet ->
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color(0xFF0F766E),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(bullet, fontSize = 10.5.sp, color = Color(0xFF334155))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 6. STORES & DOWNLOAD BADGES
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                border = BorderStroke(1.dp, Color(0xFF1E293B))
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "DOWNLOAD CHANNELS",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2DD4BF),
+                        letterSpacing = 1.sp
+                    )
+
+                    Text(
+                        text = "Secure Clinical Deployments",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+
+                    Text(
+                        text = "Click to run a verified, cryptographically checked simulation download for your sovereign OS device:",
+                        fontSize = 10.sp,
+                        color = Color(0xFF94A3B8),
+                        textAlign = TextAlign.Center
+                    )
+
+                    // Download Buttons Stack
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Google Play Button
+                        Button(
+                            onClick = { downloadingPlatform = "Google Play Store" },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFF334155)),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text("GET IT ON", fontSize = 7.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Bold)
+                                    Text("Google Play", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        // App Store Button
+                        Button(
+                            onClick = { downloadingPlatform = "Apple App Store" },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFF334155)),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhoneIphone,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text("DOWNLOAD ON THE", fontSize = 7.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Bold)
+                                    Text("App Store", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        // Direct APK Button
+                        Button(
+                            onClick = { downloadingPlatform = "Direct Secure APK" },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFF14B8A6)),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Android,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text("SECURE DIRECT DOWNLOAD", fontSize = 7.sp, color = Color(0xFFCCFBF1), fontWeight = FontWeight.Bold)
+                                    Text("Download CareOS APK", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Final Pediatrician card from Unsplash
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(110.dp)
+                            .padding(top = 8.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AsyncImage(
+                                model = "https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?auto=format&fit=crop&q=80&w=400",
+                                contentDescription = "Pediatric checkup",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f))
+                                        )
+                                    )
+                            )
+                            Text(
+                                text = "Bridging pediatric and primary care gaps securely.",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 7. BOTTOM CTA - ACTION GATE
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = onProceedClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("landing_proceed_button")
+                ) {
+                    Text("Access Secure Patient Portal", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(imageVector = Icons.Default.ArrowForward, contentDescription = null, tint = Color.White)
+                }
+
+                Text(
+                    text = "CareOS Version 1.4.0 • Compliant with NDPR Cryptographic Ledger Guidelines",
+                    fontSize = 8.5.sp,
+                    color = Color(0xFF64748B),
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+// ==========================================
+// --- SECURE CLINICAL AUTHENTICATION GATE SCREEN ---
+// ==========================================
+@Composable
 fun CareOSAuthScreen(viewModel: CareViewModel) {
+    var showLandingPage by remember { mutableStateOf(true) }
     var isSignUpMode by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("demo@careos.org") }
     var password by remember { mutableStateOf("password123") }
@@ -8391,6 +9173,14 @@ fun CareOSAuthScreen(viewModel: CareViewModel) {
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
+    
+    if (showLandingPage) {
+        CareOSLandingPageScreen(
+            viewModel = viewModel,
+            onProceedClick = { showLandingPage = false }
+        )
+        return
+    }
     
     Box(
         modifier = Modifier
@@ -8437,6 +9227,25 @@ fun CareOSAuthScreen(viewModel: CareViewModel) {
                 textAlign = TextAlign.Center,
                 lineHeight = 16.sp
             )
+            
+            TextButton(
+                onClick = { showLandingPage = true },
+                modifier = Modifier.testTag("back_to_tour_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = Color(0xFF14B8A6),
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "View App Tour, Stories & Downloads",
+                    color = Color(0xFF14B8A6),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             
             Spacer(modifier = Modifier.height(4.dp))
             
