@@ -90,6 +90,17 @@ data class PersonalEHR(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "immutable_audit_trail")
+data class AuditLogEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val timestamp: Long = System.currentTimeMillis(),
+    val actionType: String, // e.g. "PATIENT_TRIAGE", "REFERRAL_CREATED", "PAYMENT_PAYSTACK", "PAYMENT_STRIPE"
+    val actorId: String,
+    val payloadSummary: String,
+    val previousHash: String,
+    val currentHash: String
+)
+
 @Dao
 interface CareDao {
     // Triage
@@ -142,6 +153,16 @@ interface CareDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPersonalEHR(ehr: PersonalEHR): Long
+
+    // Immutable Audit Trail
+    @Query("SELECT * FROM immutable_audit_trail ORDER BY id DESC")
+    fun getAuditTrail(): Flow<List<AuditLogEntry>>
+
+    @Query("SELECT * FROM immutable_audit_trail ORDER BY id DESC LIMIT 1")
+    suspend fun getLastAuditEntry(): AuditLogEntry?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAuditEntry(entry: AuditLogEntry): Long
 }
 
 @Database(
@@ -151,9 +172,10 @@ interface CareDao {
         InsuranceProfile::class,
         DonationRecord::class,
         PatientRecord::class,
-        PersonalEHR::class
+        PersonalEHR::class,
+        AuditLogEntry::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class CareDatabase : RoomDatabase() {
