@@ -4,6 +4,7 @@
   "private": true,
   "description": "CareOS production backend foundation",
   "license": "UNLICENSED",
+  "packageManager": "pnpm@9.15.4",
   "engines": {
     "node": "22"
   },

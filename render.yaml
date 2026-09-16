@@ -4,8 +4,8 @@ services:
     runtime: node
     plan: starter
     rootDir: backend
-    buildCommand: npm ci && npx prisma generate && npm run build
-    startCommand: npm run prisma:deploy && npm run start:prod
+    buildCommand: corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile && pnpm exec prisma generate && pnpm run build
+    startCommand: corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm run prisma:deploy && pnpm run start:prod
     healthCheckPath: /v1/health
     envVars:
       - key: NODE_ENV
