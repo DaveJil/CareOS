@@ -4,6 +4,10 @@
   "private": true,
   "description": "CareOS production backend foundation",
   "license": "UNLICENSED",
+  "engines": {
+    "node": "22.x",
+    "npm": "10.x"
+  },
   "scripts": {
     "build": "nest build",
     "start": "nest start",
