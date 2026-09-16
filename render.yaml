@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: careos-api
+    runtime: node
+    plan: starter
+    rootDir: backend
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npm run prisma:deploy && npm run start:prod
+    healthCheckPath: /v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVICE_NAME
+        value: careos-api
+      - key: API_VERSION
+        value: v1
+      - key: LOG_LEVEL
+        value: info
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: DAILY_ROOM_EXPIRY_SECONDS
+        value: "7200"
+      - key: OBJECT_STORAGE_REGION
+        value: auto
+      - key: AI_TRIAGE_PROVIDER
+        value: external
+      - key: VIDEO_PROVIDER
+        value: external
+      - key: PAYMENT_PROVIDER
+        value: paystack
+      - key: NOTIFICATION_PROVIDER
+        value: external

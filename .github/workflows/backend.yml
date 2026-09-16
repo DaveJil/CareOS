@@ -1,0 +1,64 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: careos
+          POSTGRES_PASSWORD: careos
+          POSTGRES_DB: careos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U careos -d careos_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Prepare audit database
+        run: npm run prisma:deploy
+        env:
+          DATABASE_URL: postgresql://careos:careos@localhost:5432/careos_test
+
+      - name: Production demo-data audit
+        run: npm run prod:demo-audit
+        env:
+          DATABASE_URL: postgresql://careos:careos@localhost:5432/careos_test

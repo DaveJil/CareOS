@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "987152384920",
+    "project_id": "careos-42964",
+    "storage_bucket": "careos-42964.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:987152384920:android:1f86458b2b990f1485e1ed",
+        "android_client_info": {
+          "package_name": "com.imotion.careos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpSAAGKogv9pLAFvtdkmRxTLCwYSaucL4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,11 @@
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = 'postgresql://careos:careos@localhost:5432/careos_test';
+process.env.REDIS_URL = 'redis://localhost:6379';
+process.env.OBJECT_STORAGE_ENDPOINT = 'http://localhost:9000';
+process.env.OBJECT_STORAGE_BUCKET = 'careos-test';
+process.env.OBJECT_STORAGE_REGION = 'local';
+process.env.OBJECT_STORAGE_ACCESS_KEY = 'test';
+process.env.OBJECT_STORAGE_SECRET_KEY = 'test';
+process.env.DOCUMENT_ENCRYPTION_KEY = 'test-document-encryption-key-32b';
+process.env.JWT_ACCESS_TOKEN_SECRET = 'test-access-secret';
+process.env.JWT_REFRESH_TOKEN_SECRET = 'test-refresh-secret';
