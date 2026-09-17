@@ -3,6 +3,7 @@ import { Role } from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
+  IsIn,
   IsOptional,
   IsPhoneNumber,
   IsString,
@@ -25,8 +26,8 @@ export class RegisterDto {
   @MinLength(8)
   password!: string;
 
-  @ApiProperty({ enum: Role, example: Role.patient })
-  @IsEnum(Role)
+  @ApiProperty({ enum: [Role.patient, Role.clinician], example: Role.patient })
+  @IsIn([Role.patient, Role.clinician])
   role!: Role;
 
   @ApiPropertyOptional({ example: 'iphone-15-samira' })

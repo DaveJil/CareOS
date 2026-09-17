@@ -34,6 +34,10 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
+    if (dto.role !== Role.patient && dto.role !== Role.clinician) {
+      throw new BadRequestException('Only patient and clinician accounts can self-register.');
+    }
+
     const existing = await this.prisma.user.findFirst({
       where: {
         OR: [{ email: dto.email.toLowerCase() }, ...(dto.phone ? [{ phone: dto.phone }] : [])],

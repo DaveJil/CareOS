@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { ConsentType, OtpPurpose, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from '../src/modules/auth/auth.service';
@@ -19,14 +19,7 @@ type StoredUser = {
 };
 
 describe('AuthService Phase 1 account access', () => {
-  it.each([
-    Role.patient,
-    Role.clinician,
-    Role.hospital_admin,
-    Role.hmo_staff,
-    Role.fund_admin,
-    Role.super_admin,
-  ])('registers and logs in %s accounts', async (role) => {
+  it.each([Role.patient, Role.clinician])('registers and logs in %s accounts', async (role) => {
     const { auth, prisma } = createHarness();
     const email = `${role}@careos.test`;
 
@@ -55,6 +48,21 @@ describe('AuthService Phase 1 account access', () => {
       'auth.login',
     ]);
   });
+
+  it.each([Role.hospital_admin, Role.hmo_staff, Role.fund_admin, Role.super_admin])(
+    'blocks public registration for privileged role %s',
+    async (role) => {
+      const { auth } = createHarness();
+
+      await expect(
+        auth.register({
+          email: `${role}@careos.test`,
+          password: 'strong-password-123',
+          role,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    },
+  );
 
   it('blocks duplicate account registration', async () => {
     const { auth } = createHarness();
